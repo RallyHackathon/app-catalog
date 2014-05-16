@@ -17,6 +17,7 @@
       "CumulativeFlowChartApp.js"
    ],
    "css": [
-      "../../Charts.css"
+      "../../Charts.css",
+      "CumulativeFlowChartApp.css"
    ]
 }
