@@ -274,6 +274,23 @@
             }
             grid.on('selectionchange', this._onSelectionChange, this);
         },
+        
+        _onChildrenRetrievedMilestone: function(store, records) {
+            var grid = this.down('#left').add({
+                xtype: 'rallygrid',
+                store: store,
+                columnCfgs: ['FormattedID', 'Name', 'Project'],
+                showRowActionsColumn: false,
+                selType: 'rowmodel',
+                model: 'userStoryModel',
+                enableEditing: false,
+                sortableColumns: false
+            });
+            if(!this.onlyStoriesInCurrentProject){
+                grid.getSelectionModel().selectAll(true);
+            }
+            grid.on('selectionchange', this._onSelectionChange, this);
+        },
 
         _onPortfolioItemRetrieved: function (store) {
             var storeData = store.getAt(0),
@@ -284,29 +301,93 @@
                 return;
             }
             
+            // begin long hairy if statement that broke things..
+            
             if(this.onlyStoriesInCurrentProject){
-                storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+                if(storeData.self.ordinal === 0){
+                    console.log("testing");
+                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+                        autoLoad: true,
+                        filters: {
+                            property: 'Project',
+                            operator: '=',
+                            value: this._getGlobalContext().getDataContext().project
+                        },
+                        listeners: {
+                            load: this._onChildrenRetrieved,
+                            scope: this
+                        }
+                    });
+                } else if (storeData.self.ordinal == 1){
+                    // insert changes for when the chosen portfolio item is a milestone
+                    console.log("this is a milestone");
+                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                     autoLoad: true,
-                    filters: {
-                        property: 'Project',
-                        operator: '=',
-                        value: this._getGlobalContext().getDataContext().project
-                    },
                     listeners: {
-                        load: this._onChildrenRetrieved,
+                        load: this._onChildrenRetrievedMilestone,
                         scope: this
-                    }
-                });
-            } else {
-                storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+                    },
+                    limit: Infinity
+                    });
+                } else {
+                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                     autoLoad: true,
                     listeners: {
                         load: this._onChildrenRetrieved,
                         scope: this
                     },
                     limit: Infinity
-                });
+                    });
+                }
+            } else {
+                if (storeData.self.ordinal == 1){
+                    // insert changes for when the chosen portfolio item is a milestone
+                    console.log("this is a milestone");
+                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+                    autoLoad: true,
+                    listeners: {
+                        load: this._onChildrenRetrievedMilestone,
+                        scope: this
+                    },
+                    limit: Infinity
+                    });
+                } else {
+                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+                    autoLoad: true,
+                    listeners: {
+                        load: this._onChildrenRetrieved,
+                        scope: this
+                    },
+                    limit: Infinity
+                    });
+                }
             }
+            
+            // begin old if statement only covers features use case
+            
+            // if(this.onlyStoriesInCurrentProject){
+            //     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+            //             autoLoad: true,
+            //             filters: {
+            //                 property: 'Project',
+            //                 operator: '=',
+            //                 value: this._getGlobalContext().getDataContext().project
+            //             },
+            //             listeners: {
+            //                 load: this._onChildrenRetrieved,
+            //                 scope: this
+            //             }
+            //         });
+            // } else {
+            //     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+            //     autoLoad: true,
+            //     listeners: {
+            //         load: this._onChildrenRetrieved,
+            //         scope: this
+            //     },
+            //     limit: Infinity
+            //     });
+            // }
 
             if (portfolioItemRecord) {
                 Rally.data.ModelFactory.getModel({
