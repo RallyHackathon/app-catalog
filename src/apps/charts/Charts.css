@@ -2,6 +2,7 @@
 .app-settings .settings-form .paddedSettingCmp {
     margin: 15px;
     border: 0px;
+    height: 100px;
 }
 
 .burndown-app .chartControls .rui-triggerfield {
