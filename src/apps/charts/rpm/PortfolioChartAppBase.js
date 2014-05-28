@@ -125,14 +125,6 @@
             
             config.storeConfig.find = config.storeConfig.find || {};
             
-            // if(this.onlyStoriesInCurrentProject){
-            //     config.storeConfig.find._ItemHierarchy = {
-            //         $in: _.map('Project', this._getGlobalContext().getDataContext().project)
-            //     };
-            // } else {
-            //     config.storeConfig.find = config.storeConfig.find || {};
-            // }
-
             config.calculatorConfig = config.calculatorConfig || {};
 
             config.chartConfig = config.chartConfig || {};
@@ -146,12 +138,6 @@
             ];
 
             this.chartComponentConfig = config;
-            
-            // if(this.onlyStoriesInCurrentProject){
-            //     this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
-            //         $in: _.map('Project', this._getGlobalContext().getDataContext().project)
-            //     };
-            // }
         },
 
         _buildHelpComponent: function () {
@@ -267,8 +253,12 @@
                     mode: 'SIMPLE'
                 },
                 enableEditing: false,
-                sortableColumns: false
+                sortableColumns: false,
+                autoScroll: true,
+                height: 500,
+                showPagingToolbar: false
             });
+            
             if(!this.onlyStoriesInCurrentProject){
                 grid.getSelectionModel().selectAll(true);
             }
@@ -284,8 +274,12 @@
                 selType: 'rowmodel',
                 model: 'userStoryModel',
                 enableEditing: false,
-                sortableColumns: false
+                sortableColumns: false,
+                autoScroll: true,
+                height: 500,
+                showPagingToolbar: false
             });
+            
             if(!this.onlyStoriesInCurrentProject){
                 grid.getSelectionModel().selectAll(true);
             }
@@ -301,11 +295,8 @@
                 return;
             }
             
-            // begin long hairy if statement that broke things..
-            
             if(this.onlyStoriesInCurrentProject){
                 if(storeData.self.ordinal === 0){
-                    console.log("testing");
                     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                         autoLoad: true,
                         filters: {
@@ -320,7 +311,6 @@
                     });
                 } else if (storeData.self.ordinal == 1){
                     // insert changes for when the chosen portfolio item is a milestone
-                    console.log("this is a milestone");
                     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                     autoLoad: true,
                     listeners: {
@@ -342,7 +332,6 @@
             } else {
                 if (storeData.self.ordinal == 1){
                     // insert changes for when the chosen portfolio item is a milestone
-                    console.log("this is a milestone");
                     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                     autoLoad: true,
                     listeners: {
@@ -363,32 +352,6 @@
                 }
             }
             
-            // begin old if statement only covers features use case
-            
-            // if(this.onlyStoriesInCurrentProject){
-            //     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-            //             autoLoad: true,
-            //             filters: {
-            //                 property: 'Project',
-            //                 operator: '=',
-            //                 value: this._getGlobalContext().getDataContext().project
-            //             },
-            //             listeners: {
-            //                 load: this._onChildrenRetrieved,
-            //                 scope: this
-            //             }
-            //         });
-            // } else {
-            //     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-            //     autoLoad: true,
-            //     listeners: {
-            //         load: this._onChildrenRetrieved,
-            //         scope: this
-            //     },
-            //     limit: Infinity
-            //     });
-            // }
-
             if (portfolioItemRecord) {
                 Rally.data.ModelFactory.getModel({
                     type: 'UserStory',
