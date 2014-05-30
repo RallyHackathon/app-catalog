@@ -311,6 +311,7 @@
                     });
                 } else if (storeData.self.ordinal == 1){
                     // insert changes for when the chosen portfolio item is a milestone
+                    Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
                     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                     autoLoad: true,
                     listeners: {
@@ -332,6 +333,7 @@
             } else {
                 if (storeData.self.ordinal == 1){
                     // insert changes for when the chosen portfolio item is a milestone
+                    Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
                     storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
                     autoLoad: true,
                     listeners: {
@@ -656,7 +658,8 @@
                     change: this._onOnlyStoriesInCurrentProjectChanged,
                     scope: this
                 },
-                componentCls: 'current-project-only-float'
+                componentCls: 'current-project-only-float',
+                id: 'only-stories-in-current-project-element'
             });
         },
         
