@@ -13,7 +13,8 @@
         ],
 
         mixins: [
-            'Rally.apps.charts.DateMixin'
+            'Rally.apps.charts.DateMixin',
+            'Rally.Messageable'
         ],
 
         scheduleStates: ["Defined", "In-Progress", "Completed", "Accepted"],
@@ -77,13 +78,37 @@
             
             this._setDefaultConfigValues();
             this._setupUpdateBeforeRender();
-            this._loadSavedPortfolioItem();
+            //this._loadSavedPortfolioItem();
+            this._subscribeToPortfolioTree();
         },
 
         _setupChartSettings: function () {
             this.chartSettings = Ext.create("Rally.apps.charts.rpm.ChartSettings", {
                 app: this
             });
+        },
+
+        _subscribeToPortfolioTree: function() {
+            this.subscribe('portfoliotreeitemselected', this._onPortfolioTreeItemSelected, this);        
+        },
+        
+        _onPortfolioTreeItemSelected: function(treeItem) {
+            this.currentPiRecord = treeItem.getRecord();
+            this._removeChildrenGridAndChart();
+            this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
+        },
+        
+        _removeChildrenGridAndChart: function() {
+            var childGrid = this.down('rallygrid'),
+                chart = this.down('rallychart');
+                
+            if (childGrid) {
+                childGrid.destroy();
+            }
+            
+            if (chart) {
+                chart.destroy();
+            }
         },
 
         _setupUpdateBeforeRender: function () {
@@ -150,14 +175,14 @@
         },
 
         _loadSavedPortfolioItem: function () {
-            //pass new objectID for feature to this function for Milestone Level Graph (maybe)
-            
             if (!this._validateSettingsChoices()) {
                 return this.owner.showSettings();
             }
 
-            var portfolioItemRef = this.getSetting(this.PI_SETTING);
-            
+            this._loadPortfolioItem(this.getSetting(this.PI_SETTING));
+        },
+        
+        _loadPortfolioItem: function(portfolioItemRef) {
             var store = Ext.create("Rally.data.wsapi.Store", {
                 model: Rally.util.Ref.getTypeFromRef(portfolioItemRef),
                 filters: [
@@ -173,7 +198,7 @@
                 },
                 scope: this
             });
-            
+
             store.on('load', this._onPortfolioItemRetrieved, this);
             store.load();
         },
@@ -288,77 +313,90 @@
 
         _onPortfolioItemRetrieved: function (store) {
             var storeData = store.getAt(0),
-                portfolioItemRecord = storeData.data;
+                portfolioItemRecord = storeData.data,
+                filters;
             
             if (!this._savedPortfolioItemValid(portfolioItemRecord)) {
                 this._portfolioItemNotValid();
                 return;
             }
             
-            if(this.onlyStoriesInCurrentProject){
-                if(storeData.self.ordinal === 0){
-                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-                        autoLoad: true,
-                        filters: {
-                            property: 'Project',
-                            operator: '=',
-                            value: this._getGlobalContext().getDataContext().project
-                        },
-                        listeners: {
-                            load: this._onChildrenRetrieved,
-                            scope: this
-                        }
-                    });
-                } else if (storeData.self.ordinal == 1){
-                    // insert changes for when the chosen portfolio item is a milestone
-                    Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
-                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-                    autoLoad: true,
-                    listeners: {
-                        load: this._onChildrenRetrievedMilestone,
-                        scope: this
-                    },
-                    limit: Infinity
-                    });
-                } else {
-                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-                    autoLoad: true,
-                    listeners: {
-                        load: this._onChildrenRetrieved,
-                        scope: this
-                    },
-                    limit: Infinity
-                    });
+            if (storeData.self.ordinal === 0) {
+                Ext.getCmp('only-stories-in-current-project-element').getEl().show();
+                if (this.onlyStoriesInCurrentProject) {
+                    filters = {
+                        property: 'Project',
+                        operator: '=',
+                        value: this._getGlobalContext().getDataContext().project
+                    };
                 }
             } else {
-                if (storeData.self.ordinal == 1){
-                    // insert changes for when the chosen portfolio item is a milestone
-                    Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
-                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-                    autoLoad: true,
-                    listeners: {
-                        load: this._onChildrenRetrievedMilestone,
-                        scope: this
-                    },
-                    limit: Infinity
-                    });
-                } else {
-                    storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-                    autoLoad: true,
-                    listeners: {
-                        load: this._onChildrenRetrieved,
-                        scope: this
-                    },
-                    limit: Infinity
-                    });
-                }
+                Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
             }
+            
+            
+            storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+                autoLoad: true,
+                filters: filters,
+                listeners: {
+                    load: storeData.self.ordinal === 1 ? this._onChildrenRetrievedMilestone : this._onChildrenRetrieved,
+                    scope: this
+                },
+                limit: Infinity
+            });
+            
+            
+                    
+            //     } else if (storeData.self.ordinal == 1){
+            //         // insert changes for when the chosen portfolio item is a milestone
+                    
+            //         storeData.getCollection('Children', {
+            //         autoLoad: true,
+            //         listeners: {
+            //             load: this._onChildrenRetrievedMilestone,
+            //             scope: this
+            //         },
+            //         limit: Infinity
+            //         });
+            //     } else {
+            //         storeData.getCollection('Children', {
+            //         autoLoad: true,
+            //         listeners: {
+            //             load: this._onChildrenRetrieved,
+            //             scope: this
+            //         },
+            //         limit: Infinity
+            //         });
+            //     }
+            // } else {
+            //     if (storeData.self.ordinal == 1){
+            //         // insert changes for when the chosen portfolio item is a milestone
+            //         Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
+            //         storeData.getCollection('Children', {
+            //         autoLoad: true,
+            //         listeners: {
+            //             load: this._onChildrenRetrievedMilestone,
+            //             scope: this
+            //         },
+            //         limit: Infinity
+            //         });
+            //     } else {
+            //         storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+            //         autoLoad: true,
+            //         listeners: {
+            //             load: this._onChildrenRetrieved,
+            //             scope: this
+            //         },
+            //         limit: Infinity
+            //         });
+            //     }
+            // }
             
             if (portfolioItemRecord) {
                 Rally.data.ModelFactory.getModel({
                     type: 'UserStory',
                     success: function (model) {
-                        this._onUserStoryModelRetrieved(model, portfolioItemRecord);
+                        this._onUserStoryModelRetrieved(model, storeData);
                     },
                     scope: this
                 });
@@ -367,10 +405,11 @@
             }
         },
 
-        _onUserStoryModelRetrieved: function (model, portfolioItemRecord) {
-            this._updateChartComponentConfig(model, portfolioItemRecord).then({
+        _onUserStoryModelRetrieved: function (model, piRecord) {
+            var piRecordData = piRecord.data;
+            this._updateChartComponentConfig(model, piRecordData).then({
                 success: function (chartComponentConfig) {
-                    if(this.onlyStoriesInCurrentProject){
+                    if( piRecord.self.ordinal === 0 && this.onlyStoriesInCurrentProject){
                         this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
                             $in: _.map('Project', this._getGlobalContext().getDataContext().project)
                         };
@@ -692,7 +731,7 @@
             //this._refreshTree();
             this.down('rallygrid').destroy();
             this.down('rallychart').destroy();
-            this._loadSavedPortfolioItem();
+            this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
         },
         
         _onFilterOnReleaseChanged: function(checkBox) {
@@ -700,7 +739,7 @@
             //this._refreshTree();
             this.down('rallygrid').destroy();
             this.down('rallychart').destroy();
-            this._loadSavedPortfolioItem();
+            this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
         },
         
         _onReleaseComboboxChanged: function(releaseCombobox){
@@ -708,7 +747,7 @@
                 //this._refreshTree(); 
                 this.down('rallygrid').destroy();
                 this.down('rallychart').destroy();
-                this._loadSavedPortfolioItem();
+                this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
             }
         },
         

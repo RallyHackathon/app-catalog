@@ -14,6 +14,9 @@
             'Rally.util.Help',
             'Rally.util.Test'
         ],
+        mixins: {
+            messageable: 'Rally.Messageable'
+        },
 
         layout: 'auto',
 
@@ -49,6 +52,8 @@
         },
 
         launch: function() {
+            Rally.Message.self.portfolioTreeItemSelected = 'portfoliotreeitemselected';
+            
 
             if(Rally.environment.getContext().getSubscription().isModuleEnabled('Rally Portfolio Manager')) {
                 Rally.data.util.PortfolioItemHelper.loadTypeOrDefault({
@@ -124,6 +129,10 @@
                 topLevelStoreConfig: {
                     filters: filters,
                     context: this.getContext().getDataContext()
+                },
+                listeners: {
+                    itemselected: this._onTreeItemSelected,
+                    scope: this
                 },
                 childItemsStoreConfigForParentRecordFn: function(record) {
                     var storeConfig = {
@@ -202,6 +211,10 @@
             });
             
             return tree;
+        },
+        
+        _onTreeItemSelected: function(treeItem) {
+            this.publish('portfoliotreeitemselected', treeItem);
         },
 
         _buildHelpComponent:function () {
