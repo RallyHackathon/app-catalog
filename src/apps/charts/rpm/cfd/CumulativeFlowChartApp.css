@@ -28,6 +28,11 @@
     float: left;
 }
 
+.portfolio-cfd-app .show-grid-checkbox-only-float {
+    float: left;
+    margin-left: 10px;
+}
+
 .portfolio-cfd-app .filter-on-release-float {
     float: left;
     margin-left: 10px;

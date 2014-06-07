@@ -22,25 +22,24 @@
         PI_SETTING: "portfolioItemPicker",
         
         layout: {
-            type:   'hbox',
+            type:   'vbox',
             align:  'stretch'
         },
 
         items: [
             {
                 xtype:  'container',
-                itemId: 'left',
-                width:  450
-            },
-            {
-                xtype:  'container',
-                itemId: 'right',
-                flex: 1,
+                itemId: 'top',
                 items: [{
                     xtype:  'container',
                     itemId: 'header',
                     cls:    'header'
-                }]
+                }],
+                height: 420
+            },
+            {
+                xtype:  'container',
+                itemId: 'bottom'
             }
         ],
 
@@ -57,25 +56,25 @@
         launch: function () {
             this._setupEvents();
             this._setupChartSettings();
-            if(Rally.environment.getContext().getSubscription().isModuleEnabled('Rally Portfolio Manager')) {
-                Rally.data.util.PortfolioItemHelper.loadTypeOrDefault({
-                    typeRef: this.getSetting('type'),
-                    context: this.getContext().getDataContext(),
-                    defaultToLowest: false,
-                    success: this.addTreeForType,
-                    scope: this
-                });
-            } else {
-                this.down('#bodyContainer').add({
-                    xtype:  'container',
-                    html:   '<div class="rpm-turned-off" style="padding: 50px; text-align: center;">You do not have RPM enabled for your subscription</div>'
-                });
+            // if(Rally.environment.getContext().getSubscription().isModuleEnabled('Rally Portfolio Manager')) {
+            //     Rally.data.util.PortfolioItemHelper.loadTypeOrDefault({
+            //         typeRef: this.getSetting('type'),
+            //         context: this.getContext().getDataContext(),
+            //         defaultToLowest: false,
+            //         success: this.addTreeForType,
+            //         scope: this
+            //     });
+            // } else {
+            //     this.add({
+            //         xtype:  'container',
+            //         html:   '<div class="rpm-turned-off" style="padding: 50px; text-align: center;">You do not have RPM enabled for your subscription</div>'
+            //     });
 
-                if (Rally.BrowserTest) {
-                    Rally.BrowserTest.publishComponentReady(this);
-                }
-            }
-            
+            //     if (Rally.BrowserTest) {
+            //         Rally.BrowserTest.publishComponentReady(this);
+            //     }
+            // }
+            this._drawHeader();
             this._setDefaultConfigValues();
             this._setupUpdateBeforeRender();
             //this._loadSavedPortfolioItem();
@@ -94,8 +93,9 @@
         
         _onPortfolioTreeItemSelected: function(treeItem) {
             this.currentPiRecord = treeItem.getRecord();
-            this._removeChildrenGridAndChart();
-            this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
+            
+            this._onPortfolioItemChanged();
+            //this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
         },
         
         _removeChildrenGridAndChart: function() {
@@ -173,46 +173,16 @@
                 })
             });
         },
-
-        _loadSavedPortfolioItem: function () {
-            if (!this._validateSettingsChoices()) {
-                return this.owner.showSettings();
-            }
-
-            this._loadPortfolioItem(this.getSetting(this.PI_SETTING));
-        },
         
-        _loadPortfolioItem: function(portfolioItemRef) {
-            var store = Ext.create("Rally.data.wsapi.Store", {
-                model: Rally.util.Ref.getTypeFromRef(portfolioItemRef),
-                filters: [
-                    {
-                        property: "ObjectID",
-                        operator: "=",
-                        value: Rally.util.Ref.getOidFromRef(portfolioItemRef)
-                    }
-                ],
-                context: {
-                    workspace: this.getContext().getWorkspaceRef(),
-                    project: null
-                },
-                scope: this
-            });
-
-            store.on('load', this._onPortfolioItemRetrieved, this);
-            store.load();
-        },
-
         _validateSettingsChoices: function () {
-            var piRef = this._getSettingPortfolioItem(),
-                startDate = this._getSettingStartDate(),
+            var startDate = this._getSettingStartDate(),
                 endDate = this._getSettingEndDate(),
                 dataType = this.getSetting("chartAggregationType"),
                 invalid = function (value) {
                     return !value || value === "undefined";
                 };
 
-            if (invalid(piRef) || invalid(startDate) || invalid(endDate) || invalid(dataType)) {
+            if (invalid(startDate) || invalid(endDate) || invalid(dataType)) {
                 return false;
             }
             return true;
@@ -224,20 +194,6 @@
 
         _getSettingEndDate: function() {
             return this.getSetting("enddate") || this.getSetting("endDate");
-        },
-
-        _getSettingPortfolioItem: function() {
-            var currentSetting = this.getSetting(this.PI_SETTING);
-            if(currentSetting && currentSetting !== "undefined") {
-                return currentSetting;
-            }
-
-            var previousSetting = this.getSetting("buttonchooser");
-            if (previousSetting && previousSetting !== "undefined") {
-                return Ext.JSON.decode(previousSetting).artifact._ref;
-            }
-
-            return "undefined";
         },
 
         _savedPortfolioItemValid: function (savedPi) {
@@ -264,11 +220,11 @@
                 };
             }
             
-            this.down('#right').add(this.chartComponentConfig);
+            this.down('#top').add(this.chartComponentConfig);
         },
         
         _onChildrenRetrieved: function(store, records) {
-            var grid = this.down('#left').add({
+            var grid = this.down('#bottom').add({
                 xtype: 'rallygrid',
                 store: store,
                 columnCfgs: ['FormattedID', 'Name', 'Project'],
@@ -291,13 +247,17 @@
         },
         
         _onChildrenRetrievedMilestone: function(store, records) {
-            var grid = this.down('#left').add({
+            var grid = this.down('#bottom').add({
                 xtype: 'rallygrid',
                 store: store,
-                columnCfgs: ['FormattedID', 'Name', 'Project'],
+                columnCfgs: ['FormattedID', 'Name'],
                 showRowActionsColumn: false,
-                selType: 'rowmodel',
-                model: 'userStoryModel',
+                //seltype: 'rowmodel',
+                selType: 'checkboxmodel',
+                //model: 'userStoryModel',
+                selModel: {
+                    mode: 'SIMPLE'
+                },
                 enableEditing: false,
                 sortableColumns: false,
                 autoScroll: true,
@@ -311,111 +271,73 @@
             grid.on('selectionchange', this._onSelectionChange, this);
         },
 
-        _onPortfolioItemRetrieved: function (store) {
-            var storeData = store.getAt(0),
-                portfolioItemRecord = storeData.data,
+        _showGrid: function() {
+            var piRecord = this.currentPiRecord,
+                piData = piRecord.data,
+                piLevel = piRecord.self.ordinal,
                 filters;
             
-            if (!this._savedPortfolioItemValid(portfolioItemRecord)) {
+            if (this._getShowGridCheckbox().getValue() !== true) {
+                return;
+            }
+                
+            if (!this._savedPortfolioItemValid(piData)) {
                 this._portfolioItemNotValid();
                 return;
             }
             
-            if (storeData.self.ordinal === 0) {
-                Ext.getCmp('only-stories-in-current-project-element').getEl().show();
-                if (this.onlyStoriesInCurrentProject) {
-                    filters = {
-                        property: 'Project',
-                        operator: '=',
-                        value: this._getGlobalContext().getDataContext().project
-                    };
-                }
-            } else {
-                Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
+            if (piLevel === 0 && this.onlyStoriesInCurrentProject) {
+                filters = {
+                    property: 'Project',
+                    operator: '=',
+                    value: this._getGlobalContext().getDataContext().project
+                };
             }
             
-            
-            storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
+            piRecord.getCollection(piLevel === 0 ? 'UserStories' : 'Children', {
                 autoLoad: true,
                 filters: filters,
                 listeners: {
-                    load: storeData.self.ordinal === 1 ? this._onChildrenRetrievedMilestone : this._onChildrenRetrieved,
+                    load: piLevel === 1 ? this._onChildrenRetrievedMilestone : this._onChildrenRetrieved,
                     scope: this
                 },
                 limit: Infinity
+            });    
+        },
+        
+        _getShowGridCheckbox: function() {
+            return this.down('#show-grid-checkbox-element');
+        },
+        
+        _showChart: function() {
+            var piRecord = this.currentPiRecord,
+                piData = piRecord.data;
+                
+             
+            Rally.data.ModelFactory.getModel({
+                type: 'UserStory',
+                success: function (model) {
+                    this._onUserStoryModelRetrieved(model, piRecord);
+                },
+                scope: this
             });
-            
-            
-                    
-            //     } else if (storeData.self.ordinal == 1){
-            //         // insert changes for when the chosen portfolio item is a milestone
-                    
-            //         storeData.getCollection('Children', {
-            //         autoLoad: true,
-            //         listeners: {
-            //             load: this._onChildrenRetrievedMilestone,
-            //             scope: this
-            //         },
-            //         limit: Infinity
-            //         });
-            //     } else {
-            //         storeData.getCollection('Children', {
-            //         autoLoad: true,
-            //         listeners: {
-            //             load: this._onChildrenRetrieved,
-            //             scope: this
-            //         },
-            //         limit: Infinity
-            //         });
-            //     }
-            // } else {
-            //     if (storeData.self.ordinal == 1){
-            //         // insert changes for when the chosen portfolio item is a milestone
-            //         Ext.getCmp('only-stories-in-current-project-element').getEl().hide();
-            //         storeData.getCollection('Children', {
-            //         autoLoad: true,
-            //         listeners: {
-            //             load: this._onChildrenRetrievedMilestone,
-            //             scope: this
-            //         },
-            //         limit: Infinity
-            //         });
-            //     } else {
-            //         storeData.getCollection(storeData.self.ordinal === 0 ? 'UserStories' : 'Children', {
-            //         autoLoad: true,
-            //         listeners: {
-            //             load: this._onChildrenRetrieved,
-            //             scope: this
-            //         },
-            //         limit: Infinity
-            //         });
-            //     }
-            // }
-            
-            if (portfolioItemRecord) {
-                Rally.data.ModelFactory.getModel({
-                    type: 'UserStory',
-                    success: function (model) {
-                        this._onUserStoryModelRetrieved(model, storeData);
-                    },
-                    scope: this
-                });
-            } else {
-                this._setErrorTextMessage("A server error occurred, please refresh the page.");
-            }
         },
 
         _onUserStoryModelRetrieved: function (model, piRecord) {
-            var piRecordData = piRecord.data;
+            var piRecordData = piRecord.data,
+                dataContext = this.getContext().getDataContext();
+                
             this._updateChartComponentConfig(model, piRecordData).then({
                 success: function (chartComponentConfig) {
                     if( piRecord.self.ordinal === 0 && this.onlyStoriesInCurrentProject){
-                        this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
-                            $in: _.map('Project', this._getGlobalContext().getDataContext().project)
-                        };
+                        // this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
+                        //     $in: _.map('Project', this._getGlobalContext().getDataContext().project)
+                        // };
+                        this.chartComponentConfig.storeConfig.find.Project = Rally.util.Ref.getOidFromRef(dataContext.project);
+                            
                     }
                     
-                    this.down('#right').add(chartComponentConfig);
+                    this.down('#top').add(chartComponentConfig);
                     Rally.environment.getMessageBus().publish(Rally.Message.piChartAppReady);
                 },
                 scope: this
@@ -616,29 +538,37 @@
         },
 
         _getChartStartDate: function (portfolioItem) {
-            var startDateSetting = this._getSettingStartDate().split(","),
-                settingValue = startDateSetting[0],
-                startDate;
+            // var startDateSetting = this._getSettingStartDate().split(","),
+            //     settingValue = startDateSetting[0],
+            var    startDate;
 
-            if(startDateSetting[0] === "selecteddate") {
-                startDate = this.dateStringToObject(startDateSetting[1]);
+            // if(startDateSetting[0] === "selecteddate") {
+            //     startDate = this.dateStringToObject(startDateSetting[1]);
+            // } else {
+            //     startDate = this._dateFromSettingValue(portfolioItem, settingValue);
+            // }
+            if (portfolioItem.PlannedStartDate) {
+                startDate = portfolioItem.PlannedStartDate;
+            } else if (portfolioItem.ActualStartDate) {
+                startDate = portfolioItem.ActualStartDate;
             } else {
-                startDate = this._dateFromSettingValue(portfolioItem, settingValue);
+                startDate = new Date();
             }
 
             return this.dateToString(startDate);
         },
 
         _getChartEndDate: function (portfolioItem) {
-            var endDateSetting = this._getSettingEndDate().split(","),
-                settingValue = endDateSetting[0],
-                endDate;
+            // var endDateSetting = this._getSettingEndDate().split(","),
+            //     settingValue = endDateSetting[0],
+            var    endDate;
 
-            if (endDateSetting[0] === "selecteddate") {
-                endDate = this.dateStringToObject(endDateSetting[1]);
-            } else {
-                endDate = this._dateFromSettingValue(portfolioItem, settingValue);
-            }
+            // if (endDateSetting[0] === "selecteddate") {
+            //     endDate = this.dateStringToObject(endDateSetting[1]);
+            // } else {
+            //     endDate = this._dateFromSettingValue(portfolioItem, settingValue);
+            // }
+            endDate = new Date();
 
             return this.dateToString(endDate);
         },
@@ -702,6 +632,18 @@
             });
         },
         
+        _buildShowGridCheckbox: function() {
+            return Ext.create('Rally.ui.CheckboxField', {
+                boxLabel: 'Show Grid',
+                listeners: {
+                    change: this._onShowGridClicked,
+                    scope: this
+                },
+                componentCls: 'show-grid-checkbox-only-float',
+                id: 'show-grid-checkbox-element'
+            });   
+        },
+        
         _buildFilterOnReleaseCheckbox: function(){
             return {
                 xtype: 'rallycheckboxfield',
@@ -726,12 +668,38 @@
             };
         },
         
+        _onShowGridClicked: function(checkbox) {
+            var grid = this.down('rallygrid');
+            if (checkbox.getValue() === true) {
+                this._showGrid();    
+            } else if (grid) {
+                grid.destroy();
+            }
+        },
+        
         _onOnlyStoriesInCurrentProjectChanged: function(checkBox) {
+            var grid = this.down('rallygrid'),
+                chart = this.down('rallychart');
+                
             this.onlyStoriesInCurrentProject = checkBox.getValue();
+            
             //this._refreshTree();
-            this.down('rallygrid').destroy();
-            this.down('rallychart').destroy();
-            this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
+            if (grid) {
+                grid.destroy();
+            }
+            if (chart) {
+                chart.destroy();
+            }
+            
+            this._onPortfolioItemChanged();
+            //this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
+        },
+        
+        _onPortfolioItemChanged: function() {
+            this._showOrHideCheckboxes();
+            this._removeChildrenGridAndChart();
+            this._showChart();
+            this._showGrid();
         },
         
         _onFilterOnReleaseChanged: function(checkBox) {
@@ -751,6 +719,17 @@
             }
         },
         
+        _showOrHideCheckboxes: function() {
+            var piLevel = this.currentPiRecord.self.ordinal,
+            currentProjectOnlyCheckbox = this.down('#only-stories-in-current-project-element');
+            
+            if (piLevel === 0) {
+                currentProjectOnlyCheckbox.show();
+            } else {
+                currentProjectOnlyCheckbox.hide();
+            }
+        },
+        
         _refreshTree: function() {
             this.down('rallyportfoliotree')._refresh();
         },
@@ -760,6 +739,7 @@
             header.add(this._buildHelpComponent());
             header.add(this._buildFilterInfo());
             header.add(this._buildCurrentProjectOnlyCheckbox());
+            header.add(this._buildShowGridCheckbox());
             //header.add(this._buildFilterOnReleaseCheckbox());
             //header.add(this._buildReleaseCombobox());
         },
@@ -767,10 +747,8 @@
         addTreeForType: function(record){
 
             this.typePath = record.get('Name');
-            this._drawHeader();
-
             var tree = this.buildTreeForType(record);
-            this.down('#bodyContainer').add(tree);
+            this.add(tree);
 
             tree.on('initialload', function(){
                 if (Rally.BrowserTest) {

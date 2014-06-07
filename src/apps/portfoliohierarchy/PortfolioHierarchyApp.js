@@ -214,7 +214,9 @@
         },
         
         _onTreeItemSelected: function(treeItem) {
-            this.publish('portfoliotreeitemselected', treeItem);
+            if (treeItem.xtype === 'rallyportfolioitemtreeitem') {
+               this.publish('portfoliotreeitemselected', treeItem);
+            }
         },
 
         _buildHelpComponent:function () {
