@@ -140,7 +140,8 @@
                             project: undefined,
                             workspace: me.getContext().getDataContext().workspace
                         },
-                        fetch: this._getChildLevelFetchFields()
+                        //fetch: this._getChildLevelFetchFields()
+                        fetch: this._getDefaultTopLevelFetchFields().concat(['Parent', 'PortfolioItem', 'WorkProduct', 'TaskStatus', 'Project', 'Iteration'])
                     };
                     if(record.self.isPortfolioItem() && // ordinal === 0 refers to lowest portfolio level (e.g. feature)
                         record.self.ordinal === 0) { // from checkbox for OnlyStoriesInCurrentProject
@@ -201,8 +202,12 @@
                 },
                 treeItemConfigForRecordFn: function (record) {
                     var config = Rally.ui.tree.PortfolioTree.prototype.treeItemConfigForRecordFn.call(tree, record);
-                    if(!me.onlyStoriesInCurrentProject && record.self.typePath === 'hierarchicalrequirement') {
-                        config.xtype = 'projectuserstorytreeitem';
+                    if (record.self.typePath === 'hierarchicalrequirement') {
+                        if(!me.onlyStoriesInCurrentProject) {
+                            config.xtype = 'projectuserstorytreeitem';
+                        } else {
+                            config.xtype = 'iterationuserstorytreeitem';
+                        }
                     }
                     return config;
                 },

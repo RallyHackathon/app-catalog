@@ -39,7 +39,8 @@
             },
             {
                 xtype:  'container',
-                itemId: 'bottom'
+                itemId: 'bottom',
+                minHeight: 100
             }
         ],
 
@@ -56,28 +57,9 @@
         launch: function () {
             this._setupEvents();
             this._setupChartSettings();
-            // if(Rally.environment.getContext().getSubscription().isModuleEnabled('Rally Portfolio Manager')) {
-            //     Rally.data.util.PortfolioItemHelper.loadTypeOrDefault({
-            //         typeRef: this.getSetting('type'),
-            //         context: this.getContext().getDataContext(),
-            //         defaultToLowest: false,
-            //         success: this.addTreeForType,
-            //         scope: this
-            //     });
-            // } else {
-            //     this.add({
-            //         xtype:  'container',
-            //         html:   '<div class="rpm-turned-off" style="padding: 50px; text-align: center;">You do not have RPM enabled for your subscription</div>'
-            //     });
-
-            //     if (Rally.BrowserTest) {
-            //         Rally.BrowserTest.publishComponentReady(this);
-            //     }
-            // }
             this._drawHeader();
             this._setDefaultConfigValues();
             this._setupUpdateBeforeRender();
-            //this._loadSavedPortfolioItem();
             this._subscribeToPortfolioTree();
         },
 
@@ -88,7 +70,7 @@
         },
 
         _subscribeToPortfolioTree: function() {
-            this.subscribe('portfoliotreeitemselected', this._onPortfolioTreeItemSelected, this);        
+            this.subscribe(this, 'portfoliotreeitemselected', this._onPortfolioTreeItemSelected, this);        
         },
         
         _onPortfolioTreeItemSelected: function(treeItem) {
@@ -123,6 +105,8 @@
             );
         },
 
+        //TODO: Do we really need to do this? It looks like its just calling the event handlers, 
+        //which ExtJS gives us for already
         _setupDynamicHooksWithEvents: function (func, event) {
             var self = this;
 
@@ -202,32 +186,23 @@
         
         _onSelectionChange: function(grid, selected) {
             this.down('rallychart').destroy();
-            
-            if(this.onlyStoriesInCurrentProject){
-                this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
-                    $in: _.map('Project', this._getGlobalContext().getDataContext().project)
-                };
-                this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
-                    $in: _.map(selected, function(record) {
-                        return record.getId();    
-                    })
-                };
-            } else {
-                this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
-                    $in: _.map(selected, function(record) {
-                        return record.getId();    
-                    })
-                };
-            }
+
+            this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
+                $in: _.map(selected, function(record) {
+                    return record.getId();    
+                })
+            };
             
             this.down('#top').add(this.chartComponentConfig);
         },
         
         _onChildrenRetrieved: function(store, records) {
+            this.gridMask.hide();
+            
             var grid = this.down('#bottom').add({
                 xtype: 'rallygrid',
                 store: store,
-                columnCfgs: ['FormattedID', 'Name', 'Project'],
+                columnCfgs: ['FormattedID', 'Name', 'PlanEstimate', 'ScheduleState', 'Project'],
                 showRowActionsColumn: false,
                 selType: 'checkboxmodel',
                 selModel: {
@@ -240,37 +215,12 @@
                 showPagingToolbar: false
             });
             
-            if(!this.onlyStoriesInCurrentProject){
+            //if(!this.onlyStoriesInCurrentProject){
                 grid.getSelectionModel().selectAll(true);
-            }
+            //}
             grid.on('selectionchange', this._onSelectionChange, this);
         },
         
-        _onChildrenRetrievedMilestone: function(store, records) {
-            var grid = this.down('#bottom').add({
-                xtype: 'rallygrid',
-                store: store,
-                columnCfgs: ['FormattedID', 'Name'],
-                showRowActionsColumn: false,
-                //seltype: 'rowmodel',
-                selType: 'checkboxmodel',
-                //model: 'userStoryModel',
-                selModel: {
-                    mode: 'SIMPLE'
-                },
-                enableEditing: false,
-                sortableColumns: false,
-                autoScroll: true,
-                height: 500,
-                showPagingToolbar: false
-            });
-            
-            if(!this.onlyStoriesInCurrentProject){
-                grid.getSelectionModel().selectAll(true);
-            }
-            grid.on('selectionchange', this._onSelectionChange, this);
-        },
-
         _showGrid: function() {
             var piRecord = this.currentPiRecord,
                 piData = piRecord.data,
@@ -294,11 +244,16 @@
                 };
             }
             
+            this.gridMask = this.gridMask || new Ext.LoadMask(this.down('#bottom'), {
+                msg:"Loading grid..."
+            });
+            this.gridMask.show();
+            
             piRecord.getCollection(piLevel === 0 ? 'UserStories' : 'Children', {
                 autoLoad: true,
                 filters: filters,
                 listeners: {
-                    load: piLevel === 1 ? this._onChildrenRetrievedMilestone : this._onChildrenRetrieved,
+                    load: this._onChildrenRetrieved,
                     scope: this
                 },
                 limit: Infinity
@@ -330,11 +285,9 @@
             this._updateChartComponentConfig(model, piRecordData).then({
                 success: function (chartComponentConfig) {
                     if( piRecord.self.ordinal === 0 && this.onlyStoriesInCurrentProject){
-                        // this.chartComponentConfig.storeConfig.find._ItemHierarchy = {
-                        //     $in: _.map('Project', this._getGlobalContext().getDataContext().project)
-                        // };
                         this.chartComponentConfig.storeConfig.find.Project = Rally.util.Ref.getOidFromRef(dataContext.project);
-                            
+                    } else {
+                        delete this.chartComponentConfig.storeConfig.find.Project;
                     }
                     
                     this.down('#top').add(chartComponentConfig);
@@ -430,8 +383,8 @@
 
         _calculateDateRange: function (portfolioItem) {
             var calcConfig = this.chartComponentConfig.calculatorConfig;
-            calcConfig.startDate = calcConfig.startDate || this._getChartStartDate(portfolioItem);
-            calcConfig.endDate = calcConfig.endDate || this._getChartEndDate(portfolioItem);
+            calcConfig.startDate = this._getChartStartDate(portfolioItem);
+            calcConfig.endDate = this._getChartEndDate(portfolioItem);
             calcConfig.timeZone = calcConfig.timeZone || this._getTimeZone();
 
             this.chartComponentConfig.chartConfig.xAxis.tickInterval = this._configureChartTicks(calcConfig.startDate, calcConfig.endDate);
@@ -542,11 +495,6 @@
             //     settingValue = startDateSetting[0],
             var    startDate;
 
-            // if(startDateSetting[0] === "selecteddate") {
-            //     startDate = this.dateStringToObject(startDateSetting[1]);
-            // } else {
-            //     startDate = this._dateFromSettingValue(portfolioItem, settingValue);
-            // }
             if (portfolioItem.PlannedStartDate) {
                 startDate = portfolioItem.PlannedStartDate;
             } else if (portfolioItem.ActualStartDate) {
@@ -559,16 +507,13 @@
         },
 
         _getChartEndDate: function (portfolioItem) {
-            // var endDateSetting = this._getSettingEndDate().split(","),
-            //     settingValue = endDateSetting[0],
             var    endDate;
 
-            // if (endDateSetting[0] === "selecteddate") {
-            //     endDate = this.dateStringToObject(endDateSetting[1]);
-            // } else {
-            //     endDate = this._dateFromSettingValue(portfolioItem, settingValue);
-            // }
-            endDate = new Date();
+            if (portfolioItem.ActualEndDate) {
+                endDate = portfolioItem.ActualEndDate;
+            } else {
+                endDate = new Date();
+            }
 
             return this.dateToString(endDate);
         },
@@ -692,7 +637,6 @@
             }
             
             this._onPortfolioItemChanged();
-            //this._loadPortfolioItem(this.currentPiRecord.get('_ref'));
         },
         
         _onPortfolioItemChanged: function() {
@@ -740,22 +684,6 @@
             header.add(this._buildFilterInfo());
             header.add(this._buildCurrentProjectOnlyCheckbox());
             header.add(this._buildShowGridCheckbox());
-            //header.add(this._buildFilterOnReleaseCheckbox());
-            //header.add(this._buildReleaseCombobox());
-        },
-        
-        addTreeForType: function(record){
-
-            this.typePath = record.get('Name');
-            var tree = this.buildTreeForType(record);
-            this.add(tree);
-
-            tree.on('initialload', function(){
-                if (Rally.BrowserTest) {
-                    Rally.BrowserTest.publishComponentReady(this);
-                }
-            }, this);
-
         },
         
         _getGlobalContext: function() {
@@ -763,109 +691,6 @@
                 this.getContext().getGlobalContext()) ||
                 //todo: ugly hack until Rally.app.Context.getGlobalContext is available in sdk 2.0
                 window.parent.Rally.environment.getContext();
-        },
-        
-        // not currently used. Will need later to add tree selector
-        buildTreeForType: function(typeRecord){
-            var me = this;
-
-            var filters = [];
-            if (this.getSetting('query')) {
-                try {
-                  filters.push(Rally.data.QueryFilter.fromQueryString(this.getSetting('query')));
-                } catch (e) {
-                    Rally.ui.notify.Notifier.showError({
-                        message: e.message
-                    });
-                }
-            }
-           
-            var tree = Ext.create('Rally.ui.tree.PortfolioTree', {
-                stateful: true,
-                stateId: this.getAppId() + 'rallyportfoliotree',
-                topLevelModel: typeRecord.get('TypePath'),
-                topLevelStoreConfig: {
-                    filters: filters,
-                    context: this.getContext().getDataContext()
-                },
-                childItemsStoreConfigForParentRecordFn: function(record) {
-                    var storeConfig = {
-                        context: {
-                            project: undefined,
-                            workspace: me.getContext().getDataContext().workspace
-                        },
-                        fetch: this._getChildLevelFetchFields()
-                    };
-                    if(record.self.isPortfolioItem() && // ordinal === 0 refers to lowest portfolio level (e.g. feature)
-                        record.self.ordinal === 0) { // from checkbox for OnlyStoriesInCurrentProject
-                                     
-                        if(me.onlyStoriesInCurrentProject) {
-                            Ext.apply(storeConfig.context, {
-                                project: me._getGlobalContext().getDataContext().project,
-                                projectScopeUp: false,//me._getGlobalContext().getDataContext().projectScopeUp?
-                                projectScopeDown: false//me._getGlobalContext().getDataContext().projectScopeDown?
-                            });
-                        } else {
-                            storeConfig.sorters = [{
-                                property: 'Project',
-                                direction: 'ASC'
-                            }, {
-                                property: 'Rank',
-                                direction: 'ASC'
-                            }];
-                        }
-                    } else if(record.self.isPortfolioItem() && 
-                        record.self.ordinal === 1) {
-                        
-                        if(me.filterOnRelease === true) {
-                            var selectedRelease = me.down('rallyreleasecombobox').getRecord();
-                            var releaseName = selectedRelease.get('Name');
-                            //var startDate = tbrecord.get('ReleaseStartDate');
-                            var endDate = selectedRelease.get('ReleaseDate');
-                            
-                            storeConfig.filters = [Rally.data.wsapi.Filter.and([{
-                                property: 'Release',
-                                operator: '=',
-                                value: null 
-                            },
-                            {
-                                property: 'PlannedEndDate',
-                                operator: '<',
-                                value: Rally.util.DateTime.toIsoString(endDate) //current release end date calculate elsewhere
-                            }]).or({
-                                property: 'Release.Name',
-                                operator: '=',
-                                value: releaseName 
-                            }).and({
-                                property: 'Parent',
-                                operator: '=',
-                                value: record.get('_ref')
-                            })];
-                        }
-
-                            //Check out Rally.data.wsapi.Filter
-                        /*storeConfig.filters = [{
-                            property: 'PlannedEndDate',
-                            operator: '<',
-                            value: '2014-04-23' //current release end date calculate elsewhere
-                        }];*/        
-                    }
-                    // ToDo: add a features in current release filter here (would need to look at ordinal === 1 since that's the level about Feature)
-                    return storeConfig;
-                },
-                treeItemConfigForRecordFn: function (record) {
-                    var config = Rally.ui.tree.PortfolioTree.prototype.treeItemConfigForRecordFn.call(tree, record);
-                    if(!me.onlyStoriesInCurrentProject && record.self.typePath === 'hierarchicalrequirement') {
-                        config.xtype = 'projectuserstorytreeitem';
-                    }
-                    return config;
-                },
-                emptyText: '<p>No portfolio items of this type found.</p>' +
-                           '<p>Click the gear to set your project to match the location of your portfolio items or to filter further by type.</p>'
-            });
-            
-            return tree;
         }
-        
     });
 }());
