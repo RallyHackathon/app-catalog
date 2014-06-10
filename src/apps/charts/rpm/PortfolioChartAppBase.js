@@ -202,7 +202,7 @@
             var grid = this.down('#bottom').add({
                 xtype: 'rallygrid',
                 store: store,
-                columnCfgs: ['FormattedID', 'Name', 'PlanEstimate', 'ScheduleState', 'Project'],
+                columnCfgs: (store.config.model.indexOf('PortfolioItem') == -1) ? ['FormattedID', 'Name', 'PlanEstimate', 'ScheduleState', 'Project'] : ['FormattedID', 'Name', 'Project'],
                 showRowActionsColumn: false,
                 selType: 'checkboxmodel',
                 selModel: {
