@@ -5,6 +5,8 @@ The demo demonstrated a page with two apps, both of which are modifications to e
 The first is the Portfolio Hierarchy app, located at src/apps/portfoliohierarchy.
 The second is the Portfolio Item Cumulative Flow Diagram app, located at src/apps/charts/rpm/cfd.
 
+We updated them so that the Portfolio Hierarchy app communicates with the diagram app to chart the chosen Portfolio Item.
+
 To create the same setup as the demo:
 - Build those apps
 - Create a custom page in ALM, with a 2 column configuration (left column smaller than right column)
